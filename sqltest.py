@@ -98,3 +98,42 @@ class TextField(Field):
     def __init__(self, name=None, default=None):
         super().__init__(name, 'text', False, default)
 
+
+class ModelMetaclass(type):
+    # cls:代表要__init__的类，此参数在实例化时由Python解释器自动提供(例如下文的User和Model)
+    # bases：代表继承父类的集合
+    # attrs：类的方法集合
+    def __new__(cls, name, bases, attrs):
+        if name == 'Model':
+            return type.__new__(cls, name, bases, attrs)
+        tableName = attrs.get('__table__', None) or name
+        logging.info('found model: %s (table: %s)' % (name, tableName))
+        mappings = dict()
+        field = []
+        primary_key = None
+        for k, v in attrs.items():
+            if isinstance(v, Field):
+                logging.info('  found mapping: %s ==> %s' % (k, v))
+                mappings[k] = v
+                if v.primary_key:
+                    # 找到主键:
+                    if primary_key:
+                        raise BaseException('Duplicate primary key for field: %s' % k)
+                    primary_key = k
+                else:
+                    field.append(k)
+            if not primary_key:
+                raise BaseException('Primary key not found.')
+            for k in mappings.keys():
+                attrs.pop(k)
+            escaped_fields = list(map(lambda f: '`%s`' % f, field))
+            attrs['__mappings__'] = mappings
+            attrs['__primary_key__'] = primary_key  # 主键属性名
+            attrs['__fields__'] = field  # 除主键外的属性名
+            attrs['__select__'] = 'select `%s`, %s from `%s`' % (primary_key, ', '.join(escaped_fields), tableName)
+            attrs['__insert__'] = 'insert into `%s` (%s, `%s`) values (%s)' % (
+            tableName, ', '.join(escaped_fields), primary_key, create_args_string(len(escaped_fields) + 1))
+            attrs['__update__'] = 'update `%s` set %s where `%s`=?' % (
+            tableName, ', '.join(map(lambda f: '`%s`=?' % (mappings.get(f).name or f), field)), primary_key)
+            attrs['__delete__'] = 'delete from `%s` where `%s`=?' % (tableName, primary_key)
+            return type.__new__(cls, name, bases, attrs)
