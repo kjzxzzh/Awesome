@@ -137,3 +137,10 @@ class ModelMetaclass(type):
             tableName, ', '.join(map(lambda f: '`%s`=?' % (mappings.get(f).name or f), field)), primary_key)
             attrs['__delete__'] = 'delete from `%s` where `%s`=?' % (tableName, primary_key)
             return type.__new__(cls, name, bases, attrs)
+
+
+class Model(dict,metaclass= ModelMetaclass):
+
+    def __init__(self,**kw):
+        super(Model,self).__init__(**kw)
+
