@@ -1,9 +1,10 @@
 '''
 Models for user, blog, comment.
 '''
-import time, uuid
+import time
+import uuid
 
-from orm import Model, StringField, BooleanField, FloatField, TextField
+from source.orm import Model, StringField, BooleanField, FloatField, TextField
 
 
 def next_id():
